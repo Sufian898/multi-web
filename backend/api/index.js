@@ -3,6 +3,8 @@ import app from '../serverApp.js';
 
 export default async function handler(req, res) {
   try {
+    // eslint-disable-next-line no-console
+    console.log('[api]', req.method, req.url);
     await connectDB();
     return app(req, res);
   } catch (e) {
