@@ -40,6 +40,14 @@ app.get('/', (req, res) => {
   res.json({ message: 'Backend server is running!' });
 });
 
+// Useful when backend base URL is configured as ".../api"
+app.get('/api', (req, res) => {
+  res.json({
+    message: 'API is running',
+    health: '/api/health',
+  });
+});
+
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', message: 'Server is healthy' });
 });
@@ -60,5 +68,10 @@ app.use('/api/admin/contact-messages', adminContactMessageRoutes);
 app.use('/api/daily-tasks', dailyTaskRoutes);
 app.use('/api/site', siteRoutes);
 app.use('/api/contact-messages', contactMessageRoutes);
+
+// API 404 (prevents Vercel default "Page Not Found" for unknown API paths)
+app.use('/api', (req, res) => {
+  res.status(404).json({ message: 'API route not found' });
+});
 
 export default app;
