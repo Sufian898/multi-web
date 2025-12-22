@@ -26,7 +26,37 @@ dotenv.config();
 export const app = express();
 
 // Middleware
-app.use(cors());
+const parseAllowedOrigins = () => {
+  const raw = String(process.env.CORS_ORIGINS || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return new Set(raw);
+};
+
+const allowedOrigins = parseAllowedOrigins();
+const corsOptions = {
+  origin(origin, callback) {
+    // allow non-browser clients (curl/postman) that send no Origin
+    if (!origin) return callback(null, true);
+
+    // If env not set, default to allow all (backwards-compatible for existing setups)
+    if (allowedOrigins.size === 0) return callback(null, true);
+
+    // Exact match allow-list
+    if (allowedOrigins.has(origin)) return callback(null, true);
+
+    return callback(new Error(`CORS blocked for origin: ${origin}`));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  optionsSuccessStatus: 204,
+};
+
+app.use(cors(corsOptions));
+// Ensure preflight is handled for all routes (important for Authorization header requests)
+app.options('*', cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
