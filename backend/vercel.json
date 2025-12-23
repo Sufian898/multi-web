@@ -5,10 +5,6 @@
     {
       "src": "/api/(.*)",
       "dest": "/api/index.js"
-    },
-    {
-      "src": "/(.*)",
-      "status": 404
     }
   ],
   "functions": {
