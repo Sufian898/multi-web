@@ -11,27 +11,35 @@ function setCorsHeaders(req, res) {
     .map((s) => s.trim())
     .filter(Boolean);
 
-  // For preflight requests, always set CORS headers
-  // For other requests, require origin header
-  if (!origin && !isPreflight) return;
-
-  // Determine if we should allow this origin
-  // If allowList is empty, allow all origins (backwards compatible)
-  // If allowList has items, only allow those origins
-  const shouldAllow = allowList.length === 0 || (origin && allowList.includes(origin));
-
-  // Always set headers for preflight, or if origin is allowed
-  if (shouldAllow || isPreflight) {
+  // CRITICAL: Preflight requests MUST always get CORS headers
+  // Otherwise browser will block the actual request before it's even sent
+  if (isPreflight) {
     if (origin) {
       // Reflect the origin (required when credentials: true, can't use wildcard)
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Vary', 'Origin');
       res.setHeader('Access-Control-Allow-Credentials', 'true');
-    } else if (isPreflight) {
+    } else {
       // Preflight without origin header (rare, but handle it)
-      // Can't use credentials with wildcard, so set wildcard for preflight only
       res.setHeader('Access-Control-Allow-Origin', '*');
     }
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    return; // Early return for preflight
+  }
+
+  // For actual requests (non-preflight), check origin against allowList
+  if (!origin) return;
+
+  // Determine if we should allow this origin
+  // If allowList is empty, allow all origins (backwards compatible)
+  // If allowList has items, only allow those origins
+  const shouldAllow = allowList.length === 0 || allowList.includes(origin);
+
+  if (shouldAllow) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   }
