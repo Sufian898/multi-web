@@ -28,12 +28,19 @@ export default async function handler(req, res) {
       isConnected = true;
     }
 
+    // Vercel serverless function receives the full path
+    // Express routes are set up with /api prefix, so paths like /api/auth work directly
+    // The req.url already contains the full path including /api from Vercel's rewrite
+    
+    // Log for debugging (remove in production if needed)
+    console.log('Request:', req.method, req.url);
+    
     // Let Express handle everything
     return app(req, res);
   } catch (err) {
     console.error('Vercel handler error:', err);
     if (!res.headersSent) {
-      res.status(500).json({ message: 'Server error' });
+      res.status(500).json({ message: 'Server error', error: err.message });
     }
   }
 }
