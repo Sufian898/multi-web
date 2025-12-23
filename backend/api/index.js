@@ -85,8 +85,45 @@ export default async function handler(req, res) {
     }
 
     // Express app handles the request/response
-    // In Vercel serverless, Express app handles everything internally
-    app(req, res);
+    // Wrap in promise to ensure Vercel waits for response
+    return new Promise((resolve) => {
+      let resolved = false;
+      
+      // Track when response finishes
+      const finish = () => {
+        if (!resolved) {
+          resolved = true;
+          resolve();
+        }
+      };
+
+      // Override res.end
+      const originalEnd = res.end;
+      res.end = function(...args) {
+        if (!resolved) {
+          originalEnd.apply(this, args);
+          finish();
+        } else {
+          originalEnd.apply(this, args);
+        }
+      };
+
+      // Listen for finish/close events
+      res.once('finish', finish);
+      res.once('close', finish);
+
+      // Call Express app
+      try {
+        app(req, res);
+      } catch (syncError) {
+        console.error('Sync error calling Express app:', syncError);
+        if (!resolved && !res.headersSent) {
+          setCorsHeaders(req, res);
+          res.status(500).json({ message: 'Server error' });
+          finish();
+        }
+      }
+    });
   } catch (e) {
     // eslint-disable-next-line no-console
     console.error('Serverless handler error:', e);
