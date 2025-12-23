@@ -43,19 +43,44 @@ const allowedOrigins = (process.env.CORS_ORIGINS || '')
 app.use((req, res, next) => {
   try {
     const origin = req.headers.origin;
-
-    // Allow requests without Origin (curl/postman) or if origin is allowed
-    if (!origin || allowedOrigins.includes(origin)) {
-      res.setHeader('Access-Control-Allow-Origin', origin || '*');
-      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
-      res.setHeader('Access-Control-Allow-Credentials', 'true');
-    }
+    const isPreflight = req.method === 'OPTIONS';
 
     // Handle preflight requests
-    if (req.method === 'OPTIONS') {
+    if (isPreflight) {
+      if (origin) {
+        // If allowList is empty, allow all origins
+        // If allowList has items, only allow those origins
+        if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+          res.setHeader('Access-Control-Allow-Origin', origin);
+          res.setHeader('Vary', 'Origin');
+          res.setHeader('Access-Control-Allow-Credentials', 'true');
+        } else {
+          // Origin not allowed - still respond to preflight but without credentials
+          res.setHeader('Access-Control-Allow-Origin', origin);
+          res.setHeader('Vary', 'Origin');
+        }
+      } else {
+        // No origin - use wildcard (can't use credentials)
+        res.setHeader('Access-Control-Allow-Origin', '*');
+      }
+      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
       return res.status(204).end();
     }
+
+    // For actual requests, set CORS headers
+    if (origin) {
+      // If allowList is empty, allow all origins
+      // If allowList has items, only allow those origins
+      if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Vary', 'Origin');
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+      }
+    }
+
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
 
     next();
   } catch (err) {
@@ -116,6 +141,27 @@ app.use('/api/contact-messages', contactMessageRoutes);
 // API 404 (prevents Vercel default "Page Not Found" for unknown API paths)
 app.use('/api', (req, res) => {
   res.status(404).json({ message: 'API route not found' });
+});
+
+// Global error handler (must be last)
+app.use((err, req, res, next) => {
+  console.error('Express error handler:', err);
+  console.error('Error stack:', err.stack);
+  
+  // Set CORS headers even on error
+  const origin = req.headers.origin;
+  if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
+  
+  if (!res.headersSent) {
+    res.status(err.status || 500).json({
+      message: err.message || 'Server error',
+      ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+    });
+  }
 });
 
 export default app;
