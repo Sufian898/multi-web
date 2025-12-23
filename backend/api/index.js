@@ -1,5 +1,5 @@
 import connectDB from '../config/database.js';
-import app from './serverApp.js';
+import app from '../serverApp.js';
 
 function setCorsHeaders(req, res) {
   const origin = req.headers.origin;
