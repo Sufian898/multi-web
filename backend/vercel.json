@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "npm install --prefix backend && npx vite build",
+  "buildCommand": "npm run build",
   "rewrites": [
     {
       "source": "/api/(.*)",
