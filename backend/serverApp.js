@@ -20,96 +20,69 @@ import siteRoutes from './routes/siteRoutes.js';
 import contactMessageRoutes from './routes/contactMessageRoutes.js';
 import adminContactMessageRoutes from './routes/adminContactMessageRoutes.js';
 
-// Load environment variables
 dotenv.config();
 
-export const app = express();
+const app = express();
 
-// Middleware
-const parseAllowedOrigins = () => {
-  const raw = String(process.env.CORS_ORIGINS || '')
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean);
-  return new Set(raw);
-};
+/* =======================
+   ✅ CORS (Vercel Safe)
+======================= */
 
-// Core CORS fix for Vercel serverless
 const allowedOrigins = (process.env.CORS_ORIGINS || '')
   .split(',')
   .map(o => o.trim())
   .filter(Boolean);
 
-app.use((req, res, next) => {
-  try {
-    const origin = req.headers.origin;
-    const isPreflight = req.method === 'OPTIONS';
+app.use(
+  cors({
+    origin(origin, callback) {
+      // allow server-to-server / Postman
+      if (!origin) return callback(null, true);
 
-    // Handle preflight requests
-    if (isPreflight) {
-      if (origin) {
-        // If allowList is empty, allow all origins
-        // If allowList has items, only allow those origins
-        if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
-          res.setHeader('Access-Control-Allow-Origin', origin);
-          res.setHeader('Vary', 'Origin');
-          res.setHeader('Access-Control-Allow-Credentials', 'true');
-        } else {
-          // Origin not allowed - still respond to preflight but without credentials
-          res.setHeader('Access-Control-Allow-Origin', origin);
-          res.setHeader('Vary', 'Origin');
-        }
-      } else {
-        // No origin - use wildcard (can't use credentials)
-        res.setHeader('Access-Control-Allow-Origin', '*');
+      // allow all if env empty
+      if (allowedOrigins.length === 0) {
+        return callback(null, true);
       }
-      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
-      return res.status(204).end();
-    }
 
-    // For actual requests, set CORS headers
-    if (origin) {
-      // If allowList is empty, allow all origins
-      // If allowList has items, only allow those origins
-      if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
-        res.setHeader('Access-Control-Allow-Origin', origin);
-        res.setHeader('Vary', 'Origin');
-        res.setHeader('Access-Control-Allow-Credentials', 'true');
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
       }
-    }
 
-    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
+      return callback(new Error('Not allowed by CORS'));
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  })
+);
 
-    next();
-  } catch (err) {
-    console.error('CORS middleware error:', err);
-    next(); // continue to avoid crash
-  }
-});
-
+// Express body parsers
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Static uploads (dev/local). On Vercel, filesystem is ephemeral.
-// We serve BOTH possible folders because in monorepos the backend may start with cwd=repo-root
-// while this file lives under /backend. Upload routes currently write under process.cwd()/uploads.
+/* =======================
+   Static uploads
+======================= */
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
 const uploadsFromCwd = path.join(process.cwd(), 'uploads');
 const uploadsFromBackend = path.join(__dirname, 'uploads');
+
 app.use('/uploads', express.static(uploadsFromCwd));
 if (uploadsFromBackend !== uploadsFromCwd) {
   app.use('/uploads', express.static(uploadsFromBackend));
 }
 
-// Routes
+/* =======================
+   Health & Root
+======================= */
+
 app.get('/', (req, res) => {
   res.json({ message: 'Backend server is running!' });
 });
 
-// Useful when backend base URL is configured as ".../api"
 app.get('/api', (req, res) => {
   res.json({
     message: 'API is running',
@@ -121,7 +94,10 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', message: 'Server is healthy' });
 });
 
-// Use routes
+/* =======================
+   Routes
+======================= */
+
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/tasks', taskRoutes);
@@ -138,28 +114,24 @@ app.use('/api/daily-tasks', dailyTaskRoutes);
 app.use('/api/site', siteRoutes);
 app.use('/api/contact-messages', contactMessageRoutes);
 
-// API 404 (prevents Vercel default "Page Not Found" for unknown API paths)
+/* =======================
+   API 404
+======================= */
+
 app.use('/api', (req, res) => {
   res.status(404).json({ message: 'API route not found' });
 });
 
-// Global error handler (must be last)
+/* =======================
+   Global Error Handler
+======================= */
+
 app.use((err, req, res, next) => {
-  console.error('Express error handler:', err);
-  console.error('Error stack:', err.stack);
-  
-  // Set CORS headers even on error
-  const origin = req.headers.origin;
-  if (origin) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Vary', 'Origin');
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-  }
-  
+  console.error('Express error:', err);
+
   if (!res.headersSent) {
     res.status(err.status || 500).json({
       message: err.message || 'Server error',
-      ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
     });
   }
 });
