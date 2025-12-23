@@ -1,5 +1,5 @@
-import connectDB from '../config/database.js';
-import app from '../serverApp.js';
+import connectDB from '../backend/config/database.js';
+import app from '../backend/serverApp.js';
 
 let isConnected = false;
 
@@ -44,3 +44,4 @@ export default async function handler(req, res) {
     }
   }
 }
+
