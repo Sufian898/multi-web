@@ -10,6 +10,7 @@
     "create-admin": "node utils/createAdmin.js",
     "seed-classes": "node utils/seedClasses.js",
     "seed-shop": "node utils/seedShopProducts.js"
+     "install:backend": "npm install --prefix backend",
   },
   "keywords": [],
   "author": "",
