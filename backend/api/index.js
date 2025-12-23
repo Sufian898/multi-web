@@ -3,18 +3,35 @@ import app from '../serverApp.js';
 
 function setCorsHeaders(req, res) {
   const origin = req.headers.origin;
+  const isPreflight = req.method === 'OPTIONS';
+  
   // If you set CORS_ORIGINS on Vercel, prefer reflecting only allowed origins
   const allowList = String(process.env.CORS_ORIGINS || '')
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean);
 
-  if (!origin) return;
+  // For preflight requests, always set CORS headers
+  // For other requests, require origin header
+  if (!origin && !isPreflight) return;
 
-  if (allowList.length === 0 || allowList.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Vary', 'Origin');
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  // Determine if we should allow this origin
+  // If allowList is empty, allow all origins (backwards compatible)
+  // If allowList has items, only allow those origins
+  const shouldAllow = allowList.length === 0 || (origin && allowList.includes(origin));
+
+  // Always set headers for preflight, or if origin is allowed
+  if (shouldAllow || isPreflight) {
+    if (origin) {
+      // Reflect the origin (required when credentials: true, can't use wildcard)
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Vary', 'Origin');
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+    } else if (isPreflight) {
+      // Preflight without origin header (rare, but handle it)
+      // Can't use credentials with wildcard, so set wildcard for preflight only
+      res.setHeader('Access-Control-Allow-Origin', '*');
+    }
     res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   }
