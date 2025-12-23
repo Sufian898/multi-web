@@ -46,9 +46,10 @@ function setCorsHeaders(req, res) {
 }
 
 export default async function handler(req, res) {
+  // Ensure we always send a response, even on errors
   try {
     // eslint-disable-next-line no-console
-    console.log('[api]', req.method, req.url, 'Origin:', req.headers.origin);
+    console.log('[api] Handler called:', req.method, req.url, 'Origin:', req.headers.origin);
 
     // CRITICAL: Handle preflight requests FIRST, before anything else
     // Preflight MUST always succeed, otherwise browser won't send actual request
@@ -69,6 +70,7 @@ export default async function handler(req, res) {
       res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
       res.setHeader('Access-Control-Max-Age', '86400'); // Cache preflight for 24 hours
       
+      console.log('[api] Preflight response sent');
       return res.status(204).end();
     }
 
@@ -77,34 +79,51 @@ export default async function handler(req, res) {
 
     // Connect to database (with error handling)
     try {
+      console.log('[api] Connecting to database...');
       await connectDB();
+      console.log('[api] Database connected');
     } catch (dbError) {
-      console.error('Database connection error:', dbError);
+      console.error('[api] Database connection error:', dbError.message);
+      console.error('[api] Database error stack:', dbError.stack);
       // Don't crash - continue without DB connection for routes that don't need it
       // Some routes might work without DB (like health checks)
     }
 
     // Express app handles the request/response
     // Wrap in promise to ensure Vercel waits for response
-    return new Promise((resolve) => {
+    console.log('[api] Calling Express app...');
+    return new Promise((resolve, reject) => {
       let resolved = false;
+      const timeout = setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          console.error('[api] Timeout waiting for Express response');
+          if (!res.headersSent) {
+            setCorsHeaders(req, res);
+            res.status(504).json({ message: 'Request timeout' });
+          }
+          resolve();
+        }
+      }, 25000); // 25 second timeout
       
       // Track when response finishes
       const finish = () => {
         if (!resolved) {
           resolved = true;
+          clearTimeout(timeout);
+          console.log('[api] Response finished');
           resolve();
         }
       };
 
       // Override res.end
-      const originalEnd = res.end;
+      const originalEnd = res.end.bind(res);
       res.end = function(...args) {
         if (!resolved) {
-          originalEnd.apply(this, args);
+          originalEnd(...args);
           finish();
         } else {
-          originalEnd.apply(this, args);
+          originalEnd(...args);
         }
       };
 
@@ -114,26 +133,39 @@ export default async function handler(req, res) {
 
       // Call Express app
       try {
+        if (!app) {
+          throw new Error('Express app not initialized');
+        }
         app(req, res);
       } catch (syncError) {
-        console.error('Sync error calling Express app:', syncError);
+        console.error('[api] Sync error calling Express app:', syncError.message);
+        console.error('[api] Sync error stack:', syncError.stack);
         if (!resolved && !res.headersSent) {
           setCorsHeaders(req, res);
-          res.status(500).json({ message: 'Server error' });
+          res.status(500).json({ 
+            message: 'Server error',
+            error: syncError.message 
+          });
+          finish();
+        } else {
           finish();
         }
       }
     });
   } catch (e) {
     // eslint-disable-next-line no-console
-    console.error('Serverless handler error:', e);
-    console.error('Error stack:', e.stack);
-    setCorsHeaders(req, res);
-    if (!res.headersSent) {
-      return res.status(500).json({ 
-        message: 'Server error', 
-        error: process.env.NODE_ENV === 'development' ? e.message : 'Internal server error' 
-      });
+    console.error('[api] Top-level handler error:', e.message);
+    console.error('[api] Error stack:', e.stack);
+    try {
+      setCorsHeaders(req, res);
+      if (!res.headersSent) {
+        return res.status(500).json({ 
+          message: 'Server error', 
+          error: e.message || 'Internal server error'
+        });
+      }
+    } catch (responseError) {
+      console.error('[api] Error sending error response:', responseError);
     }
   }
 }
