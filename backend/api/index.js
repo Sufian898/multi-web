@@ -48,15 +48,32 @@ function setCorsHeaders(req, res) {
 export default async function handler(req, res) {
   try {
     // eslint-disable-next-line no-console
-    console.log('[api]', req.method, req.url);
+    console.log('[api]', req.method, req.url, 'Origin:', req.headers.origin);
 
-    // Always attach CORS headers for browser requests (even on errors / before Express runs)
-    setCorsHeaders(req, res);
-
-    // Fast-path preflight: don't force DB connection for OPTIONS
+    // CRITICAL: Handle preflight requests FIRST, before anything else
+    // Preflight MUST always succeed, otherwise browser won't send actual request
     if (req.method === 'OPTIONS') {
+      const origin = req.headers.origin;
+      
+      // Always reflect the origin for preflight (browser needs this)
+      if (origin) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Vary', 'Origin');
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+      } else {
+        // No origin header (rare) - allow all
+        res.setHeader('Access-Control-Allow-Origin', '*');
+      }
+      
+      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+      res.setHeader('Access-Control-Max-Age', '86400'); // Cache preflight for 24 hours
+      
       return res.status(204).end();
     }
+
+    // For actual requests, set CORS headers
+    setCorsHeaders(req, res);
 
     await connectDB();
     return app(req, res);
