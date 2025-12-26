@@ -2,17 +2,18 @@ import connectDB from '../config/database.js';
 import app from '../serverApp.js';
 
 const allowedOrigins = [
-  'https://lifechangerway.com',
-  'http://localhost:5173'
+  'https://lifechangerway.com',  // production frontend
+  'http://localhost:5173'        // local dev
 ];
 
 export default async function handler(req, res) {
   try {
     const origin = req.headers.origin;
+
+    // Set CORS headers manually
     if (allowedOrigins.includes(origin)) {
       res.setHeader('Access-Control-Allow-Origin', origin);
     }
-
     res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
     res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -22,8 +23,10 @@ export default async function handler(req, res) {
       return res.status(204).end();
     }
 
-    // Connect DB and pass request to Express app
+    // Connect to DB
     await connectDB();
+
+    // Pass request to Express app
     return app(req, res);
   } catch (err) {
     console.error('Serverless handler error:', err);
