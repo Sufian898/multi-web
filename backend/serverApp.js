@@ -26,28 +26,30 @@ dotenv.config();
 export const app = express();
 
 // Middleware
-const allowedOrigins = [
-  'https://lifechangerway.com',
-  'https://www.lifechangerway.com',
-  'http://localhost:5173',
-  'http://localhost:3000'
-];
+// CORS middleware
+app.use((req, res, next) => {
+  const allowedOrigins = [
+    'https://lifechangerway.com', // production frontend
+    'http://localhost:5173'       // local dev
+  ];
 
-app.use(cors({
-  origin: function (origin, callback) {
-    // allow server-to-server or Postman
-    if (!origin) return callback(null, true);
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
 
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+
+  // Preflight request
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
+
+  next();
+});
+
 app.options('*', cors());
 
 
