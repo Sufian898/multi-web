@@ -4,14 +4,15 @@ let connectDB, app, isConnected = false;
 async function loadBackend() {
   if (!connectDB || !app) {
     try {
-      console.log('Loading backend modules...');
-      const dbModule = await import('../backend/config/database.js');
-      const appModule = await import('../backend/serverApp.js');
+      console.log('Loading backend modules from backend/api/index.js...');
+      const dbModule = await import('../config/database.js');
+      const appModule = await import('../serverApp.js');
       connectDB = dbModule.default;
       app = appModule.app || appModule.default;
       console.log('Backend modules loaded successfully');
     } catch (importError) {
       console.error('Error importing backend modules:', importError);
+      console.error('Import error stack:', importError.stack);
       throw new Error(`Failed to import backend: ${importError.message}`);
     }
   }
@@ -64,10 +65,6 @@ export default async function handler(req, res) {
       console.log('Database connected');
     }
 
-    // Vercel serverless function receives the full path
-    // Express routes are set up with /api prefix, so paths like /api/auth work directly
-    // The req.url already contains the full path including /api from Vercel's rewrite
-    
     // Log for debugging
     console.log('Request:', req.method, req.url, 'Origin:', origin);
     
@@ -97,4 +94,3 @@ export default async function handler(req, res) {
     }
   }
 }
-
