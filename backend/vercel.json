@@ -1,19 +1,9 @@
 {
   "version": 2,
-  "buildCommand": "npm run build",
-  "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "/backend/api/index"
-    },
-    {
-      "source": "/api",
-      "destination": "/backend/api/index"
-    }
+  "builds": [
+    { "src": "api/index.js", "use": "@vercel/node" }
   ],
-  "functions": {
-    "backend/api/index.js": {
-      "maxDuration": 30
-    }
-  }
+  "routes": [
+    { "src": "/(.*)", "dest": "api/index.js" }
+  ]
 }
