@@ -26,9 +26,31 @@ dotenv.config();
 export const app = express();
 
 // Middleware
-app.use(cors());
+// Middleware
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+    const allowedOrigins = [
+      'https://lifechangerway.com',
+      'https://www.lifechangerway.com',
+      'http://localhost:3000',
+      'http://localhost:5173'
+    ];
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
+}));
+
+app.options('*', cors());
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+
 
 // Static uploads (dev/local). On Vercel, filesystem is ephemeral.
 // We serve BOTH possible folders because in monorepos the backend may start with cwd=repo-root
