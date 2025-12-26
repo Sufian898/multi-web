@@ -4,15 +4,18 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "/backend/api/index"
+      "destination": "/api/[...path]"
     },
     {
       "source": "/api",
-      "destination": "/backend/api/index"
+      "destination": "/api/index"
     }
   ],
   "functions": {
-    "backend/api/index.js": {
+    "api/[...path].js": {
+      "maxDuration": 30
+    },
+    "api/index.js": {
       "maxDuration": 30
     }
   }
