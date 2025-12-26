@@ -102,5 +102,9 @@ app.use('/api/contact-messages', contactMessageRoutes);
 app.use('/api', (req, res) => {
   res.status(404).json({ message: 'API route not found' });
 });
+app.get('/api/test', (req, res) => {
+  res.json({ message: 'API working' });
+});
 
 export default app;
+
