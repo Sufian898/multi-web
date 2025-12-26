@@ -26,31 +26,34 @@ dotenv.config();
 export const app = express();
 
 // Middleware
-// Middleware
+const allowedOrigins = [
+  'https://lifechangerway.com',
+  'https://www.lifechangerway.com',
+  'http://localhost:5173',
+  'http://localhost:3000'
+];
+
 app.use(cors({
   origin: function (origin, callback) {
+    // allow server-to-server or Postman
     if (!origin) return callback(null, true);
-    const allowedOrigins = [
-      'https://lifechangerway.com',
-      'https://www.lifechangerway.com',
-      'http://localhost:3000',
-      'http://localhost:5173'
-    ];
+
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
     }
   },
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
-
 app.options('*', cors());
+
+
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-
 
 // Static uploads (dev/local). On Vercel, filesystem is ephemeral.
 // We serve BOTH possible folders because in monorepos the backend may start with cwd=repo-root
@@ -102,10 +105,5 @@ app.use('/api/contact-messages', contactMessageRoutes);
 app.use('/api', (req, res) => {
   res.status(404).json({ message: 'API route not found' });
 });
-app.get('/api/test', (req, res) => {
-  res.json({ message: 'API working' });
-});
 
 export default app;
-
-
