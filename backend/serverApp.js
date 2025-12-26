@@ -1,5 +1,4 @@
 import express from 'express';
-import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -20,46 +19,18 @@ import siteRoutes from './routes/siteRoutes.js';
 import contactMessageRoutes from './routes/contactMessageRoutes.js';
 import adminContactMessageRoutes from './routes/adminContactMessageRoutes.js';
 
-// Load environment variables
 dotenv.config();
 
 export const app = express();
 
 // Middleware
-// CORS middleware
-app.use((req, res, next) => {
-  const allowedOrigins = [
-    'https://lifechangerway.com', // production frontend
-    'http://localhost:5173'       // local dev
-  ];
-
-  const origin = req.headers.origin;
-  if (allowedOrigins.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-  }
-
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-
-  // Preflight request
-  if (req.method === 'OPTIONS') {
-    return res.sendStatus(204);
-  }
-
-  next();
-});
-
-app.options('*', cors());
-
-
-
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Static uploads (dev/local). On Vercel, filesystem is ephemeral.
-// We serve BOTH possible folders because in monorepos the backend may start with cwd=repo-root
-// while this file lives under /backend. Upload routes currently write under process.cwd()/uploads.
+// Remove cors() usage here, handled in index.js
+// app.use(cors());
+
+// Static uploads (dev/local)
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const uploadsFromCwd = path.join(process.cwd(), 'uploads');
@@ -69,22 +40,15 @@ if (uploadsFromBackend !== uploadsFromCwd) {
   app.use('/uploads', express.static(uploadsFromBackend));
 }
 
-// Routes
-app.get('/', (req, res) => {
-  res.json({ message: 'Backend server is running!' });
-});
+// Basic routes
+app.get('/', (req, res) => res.json({ message: 'Backend server is running!' }));
 
-// Useful when backend base URL is configured as ".../api"
-app.get('/api', (req, res) => {
-  res.json({
-    message: 'API is running',
-    health: '/api/health',
-  });
-});
+app.get('/api', (req, res) => res.json({
+  message: 'API is running',
+  health: '/api/health'
+}));
 
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', message: 'Server is healthy' });
-});
+app.get('/api/health', (req, res) => res.json({ status: 'OK', message: 'Server is healthy' }));
 
 // Use routes
 app.use('/api/auth', authRoutes);
@@ -103,9 +67,7 @@ app.use('/api/daily-tasks', dailyTaskRoutes);
 app.use('/api/site', siteRoutes);
 app.use('/api/contact-messages', contactMessageRoutes);
 
-// API 404 (prevents Vercel default "Page Not Found" for unknown API paths)
-app.use('/api', (req, res) => {
-  res.status(404).json({ message: 'API route not found' });
-});
+// API 404
+app.use('/api', (req, res) => res.status(404).json({ message: 'API route not found' }));
 
 export default app;
