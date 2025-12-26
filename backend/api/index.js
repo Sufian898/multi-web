@@ -21,7 +21,7 @@ async function loadBackend() {
 
 export default async function handler(req, res) {
   try {
-    // Set CORS headers for all requests
+    // Set CORS headers for all requests (especially important for preflight)
     const origin = req.headers.origin;
     const allowedOrigins = [
       'https://lifechangerway.com',
@@ -31,15 +31,19 @@ export default async function handler(req, res) {
       'http://localhost:5000'
     ];
     
+    // Always set CORS headers, especially for preflight requests
     if (origin && allowedOrigins.includes(origin)) {
       res.setHeader('Access-Control-Allow-Origin', origin);
-    } else if (!origin) {
-      // Allow requests with no origin (like Postman, server-to-server)
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+    } else if (origin) {
+      // Origin present but not in allowed list - still set header for preflight
+      res.setHeader('Access-Control-Allow-Origin', origin);
+    } else {
+      // No origin (server-to-server, Postman)
       res.setHeader('Access-Control-Allow-Origin', '*');
     }
     
     res.setHeader('Vary', 'Origin');
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader(
       'Access-Control-Allow-Methods',
       'GET,POST,PUT,PATCH,DELETE,OPTIONS'
@@ -48,9 +52,11 @@ export default async function handler(req, res) {
       'Access-Control-Allow-Headers',
       'Content-Type, Authorization'
     );
+    res.setHeader('Access-Control-Max-Age', '86400'); // 24 hours
 
-    // Handle preflight
+    // Handle preflight OPTIONS request
     if (req.method === 'OPTIONS') {
+      console.log('OPTIONS preflight request from origin:', origin);
       return res.status(204).end();
     }
 
