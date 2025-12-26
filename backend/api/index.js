@@ -4,13 +4,13 @@ import app from '../serverApp.js';
 const allowedOrigins = [
   process.env.FRONTEND_URL,
   process.env.FRONTEND_URL_LOCAL
-];
+].filter(Boolean); // remove undefined
 
 export default async function handler(req, res) {
   try {
     const origin = req.headers.origin;
 
-    if (allowedOrigins.includes(origin)) {
+    if (origin && allowedOrigins.includes(origin)) {
       res.setHeader('Access-Control-Allow-Origin', origin);
     }
 
@@ -18,7 +18,6 @@ export default async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
     res.setHeader('Access-Control-Allow-Credentials', 'true');
 
-    // Handle OPTIONS preflight
     if (req.method === 'OPTIONS') {
       return res.status(204).end();
     }
