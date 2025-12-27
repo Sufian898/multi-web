@@ -34,15 +34,80 @@ export const register = async (req, res) => {
       return res.status(400).json({ message: 'Email already exists' });
     }
 
-    // Create user (referralCode will be auto-generated if not provided)
-    const user = await User.create({
-      name,
-      username: username.toLowerCase(),
-      email: email.toLowerCase(),
-      whatsapp,
-      password,
-      referralCode: referralCode && referralCode.trim() !== '' ? referralCode.toUpperCase() : undefined
-    });
+    // Generate unique referral code for new user
+    const generateUniqueReferralCode = async () => {
+      let isUnique = false;
+      let code = '';
+      let attempts = 0;
+      const maxAttempts = 20;
+      
+      while (!isUnique && attempts < maxAttempts) {
+        // Generate unique referral code with timestamp and random string
+        const timestamp = Date.now().toString(36).toUpperCase().slice(-4);
+        const randomPart1 = Math.random().toString(36).substring(2, 7).toUpperCase();
+        const randomPart2 = Math.random().toString(36).substring(2, 7).toUpperCase();
+        const usernamePart = (username || 'USER').toUpperCase().slice(0, 3);
+        const nanoTime = process.hrtime.bigint().toString(36).toUpperCase().slice(-3);
+        
+        code = usernamePart + timestamp + randomPart1 + randomPart2 + nanoTime;
+        
+        // Check if code already exists
+        const existingUser = await User.findOne({ referralCode: code });
+        if (!existingUser) {
+          isUnique = true;
+        }
+        attempts++;
+        
+        // Small delay to ensure timestamp changes
+        if (!isUnique && attempts < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 10));
+        }
+      }
+      
+      // Final fallback if still not unique (extremely unlikely)
+      if (!isUnique) {
+        code = 'REF' + Date.now() + Math.random().toString(36).substring(2, 15).toUpperCase();
+      }
+      
+      return code;
+    };
+
+    // Create user with retry logic for duplicate key errors
+    let user;
+    let retries = 0;
+    const maxRetries = 5;
+    
+    while (retries < maxRetries) {
+      try {
+        const uniqueReferralCode = await generateUniqueReferralCode();
+        
+        user = await User.create({
+          name,
+          username: username.toLowerCase(),
+          email: email.toLowerCase(),
+          whatsapp,
+          password,
+          referralCode: uniqueReferralCode
+        });
+        
+        break; // Success, exit retry loop
+      } catch (error) {
+        // Check if it's a duplicate key error for referralCode
+        if (error.code === 11000 && error.keyPattern && error.keyPattern.referralCode) {
+          retries++;
+          if (retries >= maxRetries) {
+            return res.status(500).json({ 
+              message: 'Unable to create account. Please try again.' 
+            });
+          }
+          // Wait a bit before retrying
+          await new Promise(resolve => setTimeout(resolve, 100 * retries));
+        } else {
+          // Other errors, throw immediately
+          throw error;
+        }
+      }
+    }
 
     // Handle referral code if provided
     if (referralCode && referralCode.trim() !== '') {
