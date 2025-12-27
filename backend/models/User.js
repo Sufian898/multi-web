@@ -129,12 +129,42 @@ userSchema.pre('save', async function(next) {
   next();
 });
 
-// Generate referral code if not provided
-userSchema.pre('save', function(next) {
-  if (!this.referralCode || this.referralCode.trim() === '') {
-    // Generate referral code based on username and random string
-    const randomPart = Math.random().toString(36).substring(2, 8).toUpperCase();
-    this.referralCode = (this.username || 'USER').toUpperCase() + randomPart;
+// Generate referral code if not provided (fallback - controller should set it)
+userSchema.pre('save', async function(next) {
+  // Only generate if referralCode is not set and this is a new document
+  if (this.isNew && (!this.referralCode || this.referralCode.trim() === '')) {
+    let isUnique = false;
+    let attempts = 0;
+    const maxAttempts = 10;
+    
+    while (!isUnique && attempts < maxAttempts) {
+      // Generate unique referral code with timestamp and random string
+      const timestamp = Date.now().toString(36).toUpperCase().slice(-4);
+      const randomPart1 = Math.random().toString(36).substring(2, 7).toUpperCase();
+      const randomPart2 = Math.random().toString(36).substring(2, 7).toUpperCase();
+      const usernamePart = (this.username || 'USER').toUpperCase().slice(0, 3);
+      const nanoTime = process.hrtime ? process.hrtime.bigint().toString(36).toUpperCase().slice(-3) : Math.random().toString(36).substring(2, 5).toUpperCase();
+      
+      this.referralCode = usernamePart + timestamp + randomPart1 + randomPart2 + nanoTime;
+      
+      // Check if code already exists
+      const query = { referralCode: this.referralCode };
+      const existingUser = await mongoose.model('User').findOne(query);
+      if (!existingUser) {
+        isUnique = true;
+      }
+      attempts++;
+      
+      // Small delay to ensure timestamp changes
+      if (!isUnique && attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
+    }
+    
+    // Fallback if still not unique (very unlikely)
+    if (!isUnique) {
+      this.referralCode = 'REF' + Date.now() + Math.random().toString(36).substring(2, 15).toUpperCase();
+    }
   }
   next();
 });
