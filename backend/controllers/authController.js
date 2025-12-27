@@ -34,6 +34,12 @@ export const register = async (req, res) => {
       return res.status(400).json({ message: 'Email already exists' });
     }
 
+    // Check if WhatsApp number exists
+    const whatsappExists = await User.findOne({ whatsapp: whatsapp.trim() });
+    if (whatsappExists) {
+      return res.status(400).json({ message: 'WhatsApp number already exists' });
+    }
+
     // Generate unique referral code for new user
     const generateUniqueReferralCode = async () => {
       let isUnique = false;
